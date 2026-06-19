@@ -31,15 +31,13 @@ Download a binary from GitHub Releases:
 https://github.com/ArsalanDotMe/switchboard-go/releases
 ```
 
-Linux x86_64 example:
+Linux/macOS one-liner:
 
 ```bash
-curl -LO https://github.com/ArsalanDotMe/switchboard-go/releases/download/v1.0.0/switchboard-go_Linux_x86_64.tar.gz
-curl -LO https://github.com/ArsalanDotMe/switchboard-go/releases/download/v1.0.0/checksums.txt
-sha256sum --check --ignore-missing checksums.txt
-tar -xzf switchboard-go_Linux_x86_64.tar.gz
-install -m 0755 switchboard-go /usr/local/bin/switchboard-go
+mkdir -p "$HOME/.local/bin" && curl -L "https://github.com/ArsalanDotMe/switchboard-go/releases/download/v1.0.0/switchboard-go_$(uname -s)_$(uname -m | sed 's/aarch64/arm64/').tar.gz" | tar -xz -C "$HOME/.local/bin" switchboard-go
 ```
+
+Make sure `~/.local/bin` is in your `PATH`.
 
 Or build from source:
 
