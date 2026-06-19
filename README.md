@@ -74,23 +74,18 @@ Download the archive for your platform from:
 https://github.com/ArsalanDotMe/switchboard-go/releases
 ```
 
-Linux x86_64 example:
+Linux x86_64 example, verified in a minimal Ubuntu 24.04 container running as
+root:
 
 ```bash
+apt-get update
+apt-get install -y ca-certificates curl
 curl -LO https://github.com/ArsalanDotMe/switchboard-go/releases/download/v1.0.0/switchboard-go_Linux_x86_64.tar.gz
 curl -LO https://github.com/ArsalanDotMe/switchboard-go/releases/download/v1.0.0/checksums.txt
 sha256sum --check --ignore-missing checksums.txt
 tar -xzf switchboard-go_Linux_x86_64.tar.gz
-sudo install -m 0755 switchboard-go /usr/local/bin/switchboard-go
-switchboard-go validate-config
-```
-
-macOS Apple Silicon example:
-
-```bash
-curl -LO https://github.com/ArsalanDotMe/switchboard-go/releases/download/v1.0.0/switchboard-go_Darwin_arm64.tar.gz
-tar -xzf switchboard-go_Darwin_arm64.tar.gz
-sudo install -m 0755 switchboard-go /usr/local/bin/switchboard-go
+install -m 0755 switchboard-go /usr/local/bin/switchboard-go
+PROXY_API_KEY=local-test-key OPENCODE_GO_API_KEYS=upstream-test-key switchboard-go validate-config
 ```
 
 Published release assets include:
@@ -101,20 +96,6 @@ Published release assets include:
 - `switchboard-go_Darwin_arm64.tar.gz`
 - `switchboard-go_Windows_x86_64.zip`
 - `checksums.txt`
-
-### From source
-
-```bash
-git clone https://github.com/ArsalanDotMe/switchboard-go.git
-cd switchboard-go
-go build -o switchboard-go .
-```
-
-### Run directly during development
-
-```bash
-go run .
-```
 
 ## Configuration
 
@@ -170,20 +151,12 @@ limits:
   max_request_body_bytes: 20971520
 ```
 
-Recommended user config path:
+Recommended user config path: `~/.config/switchboard-go/config.yaml`.
 
-```bash
-mkdir -p ~/.config/switchboard-go
-$EDITOR ~/.config/switchboard-go/config.yaml
-chmod 600 ~/.config/switchboard-go/config.yaml
-```
+Recommended system config path: `/etc/switchboard-go/config.yaml`.
 
-Recommended system config path:
-
-```bash
-sudo mkdir -p /etc/switchboard-go
-sudo install -m 0600 config.yaml /etc/switchboard-go/config.yaml
-```
+Use restrictive permissions, such as `0600`, for config files containing
+secrets.
 
 ### Environment variables
 
@@ -218,14 +191,14 @@ export PROXY_API_KEY="replace-with-a-long-random-local-key"
 export OPENCODE_GO_API_KEYS="sk-first,sk-second,sk-third"
 export LISTEN_ADDR="127.0.0.1:8080"
 
-go run .
+switchboard-go
 ```
 
 With a YAML config file:
 
 ```bash
 export SWITCHBOARD_GO_CONFIG="$HOME/.config/switchboard-go/config.yaml"
-go run .
+switchboard-go
 ```
 
 In another terminal:
@@ -405,26 +378,13 @@ image.
 
 ### GHCR
 
-The repo includes a workflow that publishes images to:
+The repo includes a workflow that publishes images to GHCR:
 
 ```text
-ghcr.io/<owner>/switchboard-go
-```
-
-Example pull:
-
-```bash
-docker pull ghcr.io/<owner>/switchboard-go:latest
+ghcr.io/arsalandotme/switchboard-go
 ```
 
 ## Deployment
-
-### Build a binary
-
-```bash
-go build -o switchboard-go .
-sudo install -m 0755 switchboard-go /usr/local/bin/switchboard-go
-```
 
 ### systemd example
 
@@ -448,14 +408,6 @@ NoNewPrivileges=true
 WantedBy=multi-user.target
 ```
 
-Then enable it:
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now switchboard-go
-sudo systemctl status switchboard-go
-```
-
 ## validate-config
 
 Run a config-only check without starting the server:
@@ -475,11 +427,7 @@ OPENCODE_GO_API_KEYS=sk-first,sk-second,sk-third
 SMTP_PASSWORD=replace-me
 ```
 
-Use restrictive permissions for config and env files containing secrets:
-
-```bash
-sudo chmod 600 /etc/switchboard-go/config.yaml /etc/switchboard-go/switchboard.env
-```
+Use restrictive permissions for config and env files containing secrets.
 
 ## Security notes
 
