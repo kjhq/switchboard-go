@@ -63,6 +63,45 @@ error envelope with HTTP 401.
 
 ## Install
 
+### Pre-built binaries
+
+Pre-built binaries are attached to each GitHub Release for Linux, macOS, and
+Windows.
+
+Download the archive for your platform from:
+
+```text
+https://github.com/ArsalanDotMe/switchboard-go/releases
+```
+
+Linux x86_64 example:
+
+```bash
+curl -LO https://github.com/ArsalanDotMe/switchboard-go/releases/download/v1.0.0/switchboard-go_Linux_x86_64.tar.gz
+curl -LO https://github.com/ArsalanDotMe/switchboard-go/releases/download/v1.0.0/checksums.txt
+sha256sum --check --ignore-missing checksums.txt
+tar -xzf switchboard-go_Linux_x86_64.tar.gz
+sudo install -m 0755 switchboard-go /usr/local/bin/switchboard-go
+switchboard-go validate-config
+```
+
+macOS Apple Silicon example:
+
+```bash
+curl -LO https://github.com/ArsalanDotMe/switchboard-go/releases/download/v1.0.0/switchboard-go_Darwin_arm64.tar.gz
+tar -xzf switchboard-go_Darwin_arm64.tar.gz
+sudo install -m 0755 switchboard-go /usr/local/bin/switchboard-go
+```
+
+Published release assets include:
+
+- `switchboard-go_Linux_x86_64.tar.gz`
+- `switchboard-go_Linux_arm64.tar.gz`
+- `switchboard-go_Darwin_x86_64.tar.gz`
+- `switchboard-go_Darwin_arm64.tar.gz`
+- `switchboard-go_Windows_x86_64.zip`
+- `checksums.txt`
+
 ### From source
 
 ```bash
@@ -492,6 +531,15 @@ Build Docker image:
 ```bash
 docker build -t switchboard-go:test .
 ```
+
+Create release artifacts locally with GoReleaser:
+
+```bash
+goreleaser release --snapshot --clean
+```
+
+Tagged GitHub releases are built by `.github/workflows/release.yml` and uploaded
+to the GitHub Release with SHA256 checksums.
 
 ## License
 

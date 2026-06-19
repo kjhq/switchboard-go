@@ -4,3 +4,4 @@
 bin/
 tmp/
 switchboard-go
+dist/
