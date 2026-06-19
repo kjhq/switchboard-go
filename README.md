@@ -246,6 +246,119 @@ curl -N http://127.0.0.1:8080/v1/chat/completions \
   }'
 ```
 
+## Agent harness setup
+
+Use the Switchboard proxy API key in client configs, not an upstream OpenCode Go
+key.
+
+### opencode
+
+Tested with `opencode-ai` 1.17.8 in a fresh `node:22-bookworm-slim` Docker
+container.
+
+Create or edit `~/.config/opencode/opencode.json`. Preserve any existing keys
+and merge in the `provider` entry plus the default `model` if desired:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "switchboard": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Switchboard",
+      "options": {
+        "baseURL": "https://switchboard.patari.us.kg/v1",
+        "apiKey": "{env:SWITCHBOARD_PROXY_API_KEY}"
+      },
+      "models": {
+        "glm-5.1": {
+          "name": "GLM-5.1",
+          "reasoning": true,
+          "limit": {
+            "context": 202752,
+            "output": 32768
+          }
+        }
+      }
+    }
+  },
+  "model": "switchboard/glm-5.1"
+}
+```
+
+Then export the proxy key before starting opencode:
+
+```bash
+export SWITCHBOARD_PROXY_API_KEY="<SWITCHBOARD_PROXY_API_KEY>"
+```
+
+Verify:
+
+```bash
+opencode models switchboard
+opencode run --model switchboard/glm-5.1 "Reply with exactly: switchboard ok"
+```
+
+Expected final response:
+
+```text
+switchboard ok
+```
+
+Restart opencode after changing config; running sessions keep the old config.
+
+### Pi Coding Agent
+
+Create or edit `~/.pi/agent/models.json`:
+
+```json
+{
+  "providers": {
+    "switchboard": {
+      "name": "Switchboard",
+      "baseUrl": "https://switchboard.patari.us.kg/v1",
+      "api": "openai-completions",
+      "apiKey": "<SWITCHBOARD_PROXY_API_KEY>",
+      "compat": {
+        "maxTokensField": "max_tokens"
+      },
+      "models": [
+        {
+          "id": "glm-5.1",
+          "name": "GLM-5.1",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 202752,
+          "maxTokens": 32768
+        }
+      ]
+    }
+  }
+}
+```
+
+Set defaults in `~/.pi/agent/settings.json`, preserving any existing settings
+keys:
+
+```json
+{
+  "defaultProvider": "switchboard",
+  "defaultModel": "glm-5.1"
+}
+```
+
+Verify:
+
+```bash
+pi --no-extensions --provider switchboard --model glm-5.1 --no-session --no-tools -p "Reply with exactly: switchboard ok"
+```
+
+Expected:
+
+```text
+switchboard ok
+```
+
 ## Admin status
 
 `/admin/status` returns inferred key state and the active key index.
