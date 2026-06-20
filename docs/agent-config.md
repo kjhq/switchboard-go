@@ -52,47 +52,42 @@ curl http://127.0.0.1:8080/v1/messages \
 
 ## opencode
 
+Log in to opencode's built-in OpenCode Go provider and use the Switchboard proxy
+API key when prompted:
+
+```bash
+opencode auth login
+```
+
+Select `opencode-go`, then paste the Switchboard proxy API key, not an upstream
+OpenCode Go key.
+
 Create or edit `~/.config/opencode/opencode.json`. Preserve any existing keys
-and merge in the `provider` entry plus the default `model` if desired:
+and merge in only the `opencode-go` provider override. This keeps opencode's
+built-in OpenCode Go model list and only changes the endpoint:
 
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
   "provider": {
-    "switchboard": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "Switchboard",
+    "opencode-go": {
       "options": {
-        "baseURL": "http://127.0.0.1:8080/v1",
-        "apiKey": "{env:SWITCHBOARD_PROXY_API_KEY}"
-      },
-      "models": {
-        "glm-5.1": {
-          "name": "GLM-5.1",
-          "reasoning": true,
-          "limit": {
-            "context": 202752,
-            "output": 32768
-          }
-        }
+        "baseURL": "http://127.0.0.1:8080/v1"
       }
     }
   },
-  "model": "switchboard/glm-5.1"
+  "model": "opencode-go/glm-5.1"
 }
 ```
 
-Then export the proxy key before starting opencode:
-
-```bash
-export SWITCHBOARD_PROXY_API_KEY="$PROXY_API_KEY"
-```
+Use your deployed Switchboard URL for `baseURL` if it is not running locally,
+for example `https://switchboard.example.com/v1`.
 
 Verify:
 
 ```bash
-opencode models switchboard
-opencode run --model switchboard/glm-5.1 "Reply with exactly: switchboard ok"
+opencode models opencode-go
+opencode run --model opencode-go/glm-5.1 "Reply with exactly: switchboard ok"
 ```
 
 Restart opencode after changing config; running sessions keep the old config.
