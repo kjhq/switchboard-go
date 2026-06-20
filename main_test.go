@@ -53,6 +53,20 @@ func TestIsQuota429RestoresBody(t *testing.T) {
 	}
 }
 
+func TestIsQuota429AnthropicUsageLimit(t *testing.T) {
+	resp := &http.Response{StatusCode: 429, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(`{"type":"error","error":{"type":"rate_limit_error","message":"credit balance is too low"}}`))}
+	if !isQuota429(resp) {
+		t.Fatal("expected anthropic credit balance 429 to count as quota")
+	}
+}
+
+func TestIsQuota429AnthropicGenericRateLimit(t *testing.T) {
+	resp := &http.Response{StatusCode: 429, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(`{"type":"error","error":{"type":"rate_limit_error","message":"rate limit reached"}}`))}
+	if isQuota429(resp) {
+		t.Fatal("expected generic anthropic rate limit not to count as quota")
+	}
+}
+
 func TestRequestTooLargeReturns413(t *testing.T) {
 	app := newApp(Config{ProxyAPIKey: "p", UpstreamAPIKeys: []string{"u"}, MaxRequestBodyBytes: 4})
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader([]byte("12345")))
@@ -74,13 +88,71 @@ func TestDoUpstreamSetsDefaultUserAgent(t *testing.T) {
 
 	app := newApp(Config{ProxyAPIKey: "p", UpstreamAPIKeys: []string{"u"}, UpstreamBaseURL: upstream.URL})
 	req := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
-	resp, err := app.doUpstream(req.Context(), req, nil, "u")
+	resp, err := app.doUpstream(req.Context(), req, nil, "u", APIStyleOpenAI)
 	if err != nil {
 		t.Fatal(err)
 	}
 	resp.Body.Close()
 	if gotUA != "OpenAI/Python 1.0.0" {
 		t.Fatalf("got user-agent %q", gotUA)
+	}
+}
+
+func TestDoUpstreamAnthropicSetsHeaders(t *testing.T) {
+	var gotPath, gotKey, gotAuth, gotVersion, gotUA string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotKey = r.Header.Get("x-api-key")
+		gotAuth = r.Header.Get("Authorization")
+		gotVersion = r.Header.Get("anthropic-version")
+		gotUA = r.Header.Get("User-Agent")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+
+	app := newApp(Config{ProxyAPIKey: "p", UpstreamAPIKeys: []string{"u"}, UpstreamBaseURL: upstream.URL})
+	req := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{"model":"minimax-m3","messages":[]}`))
+	req.Header.Set("x-api-key", "p")
+	req.Header.Set("anthropic-version", "2023-06-01")
+	resp, err := app.doUpstream(req.Context(), req, []byte(`{"model":"minimax-m3","messages":[]}`), "u", APIStyleAnthropic)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if gotPath != "/messages" || gotKey != "u" || gotAuth != "" || gotVersion != "2023-06-01" || gotUA != "anthropic-sdk-go/1.0.0" {
+		t.Fatalf("unexpected upstream request path=%q key=%q auth=%q version=%q ua=%q", gotPath, gotKey, gotAuth, gotVersion, gotUA)
+	}
+}
+
+func TestProxyAnthropicMessagesCyclesKeys(t *testing.T) {
+	var gotKeys []string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/messages" {
+			http.NotFound(w, r)
+			return
+		}
+		gotKeys = append(gotKeys, r.Header.Get("x-api-key"))
+		if r.Header.Get("x-api-key") == "bad" {
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte(`{"type":"error","error":{"type":"rate_limit_error","message":"usage limit exhausted"}}`))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"msg_1","type":"message","content":[]}`))
+	}))
+	defer upstream.Close()
+
+	app := newApp(Config{ProxyAPIKey: "p", UpstreamAPIKeys: []string{"bad", "good"}, UpstreamBaseURL: upstream.URL, MaxRequestBodyBytes: 1024})
+	req := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{"model":"minimax-m3","messages":[]}`))
+	req.Header.Set("x-api-key", "p")
+	req.Header.Set("anthropic-version", "2023-06-01")
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("got %d body %s", rec.Code, rec.Body.String())
+	}
+	if strings.Join(gotKeys, ",") != "bad,good" {
+		t.Fatalf("unexpected keys: %v", gotKeys)
 	}
 }
 
@@ -101,6 +173,25 @@ func TestAuthFailureReturnsOpenAIJSON(t *testing.T) {
 	}
 	if payload["error"] == nil {
 		t.Fatal("missing error object")
+	}
+}
+
+func TestAuthFailureReturnsAnthropicJSON(t *testing.T) {
+	app := newApp(Config{ProxyAPIKey: "p", UpstreamAPIKeys: []string{"u"}, UpstreamBaseURL: "http://example.com", MaxRequestBodyBytes: 1})
+	req := httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
+	req.Header.Set("anthropic-version", "2023-06-01")
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("got %d", rec.Code)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	errObj, ok := payload["error"].(map[string]any)
+	if payload["type"] != "error" || !ok || errObj["type"] != "authentication_error" {
+		t.Fatalf("unexpected payload: %#v", payload)
 	}
 }
 

@@ -1,7 +1,7 @@
 # Agent and client setup
 
-Point OpenAI-compatible clients at Switchboard Go and use the proxy API key, not
-your upstream OpenCode Go key.
+Point OpenAI-compatible and Anthropic Messages-compatible clients at
+Switchboard Go and use the proxy API key, not your upstream OpenCode Go key.
 
 For a local Switchboard Go process:
 
@@ -17,7 +17,7 @@ curl http://127.0.0.1:8080/v1/chat/completions \
   -H "Authorization: Bearer $PROXY_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "minimax-m3",
+    "model": "glm-5.1",
     "messages": [{"role": "user", "content": "Say hello"}],
     "max_tokens": 100
   }'
@@ -30,9 +30,23 @@ curl -N http://127.0.0.1:8080/v1/chat/completions \
   -H "Authorization: Bearer $PROXY_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "minimax-m3",
+    "model": "glm-5.1",
     "stream": true,
     "messages": [{"role": "user", "content": "Write a short poem"}]
+  }'
+```
+
+Anthropic Messages-compatible models use `/v1/messages` and `x-api-key`:
+
+```bash
+curl http://127.0.0.1:8080/v1/messages \
+  -H "x-api-key: $PROXY_API_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "minimax-m3",
+    "max_tokens": 100,
+    "messages": [{"role": "user", "content": "Say hello"}]
   }'
 ```
 
@@ -141,5 +155,5 @@ OpenAI-compatible route, so this flag is required.
 This setup exposes Pi's built-in `opencode-go` model list through Switchboard.
 Models that Pi sends through its OpenAI-compatible implementation work with
 Switchboard's `/v1/chat/completions` endpoint. Models that Pi sends through an
-Anthropic Messages implementation require an Anthropic-compatible Switchboard
-route and may not work with the `/v1` OpenAI-compatible proxy.
+Anthropic Messages implementation work with Switchboard's `/v1/messages`
+endpoint.

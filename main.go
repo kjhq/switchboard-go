@@ -46,6 +46,13 @@ type SMTPConfig struct {
 	StartTLS bool
 }
 
+type APIStyle int
+
+const (
+	APIStyleOpenAI APIStyle = iota
+	APIStyleAnthropic
+)
+
 func loadConfig() (Config, error) {
 	cfg := defaultConfig()
 	if path, ok, err := resolveConfigPath(); err != nil {
@@ -446,10 +453,10 @@ func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.handleAdmin(w, r)
 	case strings.HasPrefix(r.URL.Path, "/v1/"):
 		if !a.authOK(r) {
-			writeOpenAIError(w, http.StatusUnauthorized, "invalid_api_key", "Unauthorized")
+			writeAPIError(w, apiStyleForRequest(r), http.StatusUnauthorized, "invalid_api_key", "Unauthorized")
 			return
 		}
-		a.proxyV1(w, r)
+		a.proxyV1(w, r, apiStyleForRequest(r))
 	default:
 		http.NotFound(w, r)
 	}
@@ -578,7 +585,7 @@ func (a *App) handleValidateKeys(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, ValidateKeysResponse{Results: results})
 }
 
-func (a *App) proxyV1(w http.ResponseWriter, r *http.Request) {
+func (a *App) proxyV1(w http.ResponseWriter, r *http.Request, style APIStyle) {
 	r.Body = http.MaxBytesReader(w, r.Body, a.config.MaxRequestBodyBytes)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -596,7 +603,7 @@ func (a *App) proxyV1(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			break
 		}
-		resp, reqErr := a.doUpstream(orig, r, body, key)
+		resp, reqErr := a.doUpstream(orig, r, body, key, style)
 		if reqErr != nil {
 			http.Error(w, reqErr.Error(), http.StatusBadGateway)
 			return
@@ -609,7 +616,7 @@ func (a *App) proxyV1(w http.ResponseWriter, r *http.Request) {
 			}
 			if a.keys.ShouldNotifyAllExhausted() {
 				a.sender.NotifyAllExhausted(a.keys.Status())
-				writeOpenAIError(w, 429, "rate_limit_exceeded", "all upstream keys exhausted")
+				writeAPIError(w, style, 429, "rate_limit_exceeded", "all upstream keys exhausted")
 				return
 			}
 			continue
@@ -621,13 +628,13 @@ func (a *App) proxyV1(w http.ResponseWriter, r *http.Request) {
 		if a.keys.ShouldNotifyAllExhausted() {
 			a.sender.NotifyAllExhausted(a.keys.Status())
 		}
-		writeOpenAIError(w, 429, "rate_limit_exceeded", "all upstream keys exhausted")
+		writeAPIError(w, style, 429, "rate_limit_exceeded", "all upstream keys exhausted")
 		return
 	}
-	writeOpenAIError(w, 502, "bad_gateway", "upstream unavailable")
+	writeAPIError(w, style, 502, "bad_gateway", "upstream unavailable")
 }
 
-func (a *App) doUpstream(ctx context.Context, r *http.Request, body []byte, key string) (*http.Response, error) {
+func (a *App) doUpstream(ctx context.Context, r *http.Request, body []byte, key string, apiStyle APIStyle) (*http.Response, error) {
 	path := strings.TrimPrefix(r.URL.EscapedPath(), "/v1")
 	if path == "" {
 		path = "/"
@@ -641,12 +648,35 @@ func (a *App) doUpstream(ctx context.Context, r *http.Request, body []byte, key 
 		return nil, err
 	}
 	copyHeaders(req.Header, r.Header)
-	req.Header.Set("Authorization", "Bearer "+key)
-	if strings.TrimSpace(req.Header.Get("User-Agent")) == "" {
-		req.Header.Set("User-Agent", "OpenAI/Python 1.0.0")
+	if apiStyle == APIStyleAnthropic {
+		req.Header.Set("x-api-key", key)
+		if strings.TrimSpace(req.Header.Get("anthropic-version")) == "" {
+			req.Header.Set("anthropic-version", "2023-06-01")
+		}
+		if strings.TrimSpace(req.Header.Get("User-Agent")) == "" {
+			req.Header.Set("User-Agent", "anthropic-sdk-go/1.0.0")
+		}
+	} else {
+		req.Header.Set("Authorization", "Bearer "+key)
+		if strings.TrimSpace(req.Header.Get("User-Agent")) == "" {
+			req.Header.Set("User-Agent", "OpenAI/Python 1.0.0")
+		}
 	}
 	stripHopByHopHeaders(req.Header)
 	return a.client.Do(req)
+}
+
+func apiStyleForRequest(r *http.Request) APIStyle {
+	path := strings.TrimPrefix(r.URL.Path, "/v1")
+	if strings.HasPrefix(path, "/messages") || strings.HasPrefix(path, "/complete") {
+		return APIStyleAnthropic
+	}
+	for name := range r.Header {
+		if strings.HasPrefix(strings.ToLower(name), "anthropic-") {
+			return APIStyleAnthropic
+		}
+	}
+	return APIStyleOpenAI
 }
 
 func (a *App) validateConfigAndPrint() error {
@@ -714,7 +744,7 @@ func isQuota429(resp *http.Response) bool {
 			if strings.Contains(lowType, "usage") || strings.Contains(lowType, "quota") || strings.Contains(lowType, "freeusagelimit") {
 				return true
 			}
-			if strings.Contains(lowMsg, "quota") || strings.Contains(lowMsg, "exhausted") || strings.Contains(lowMsg, "usage limit") {
+			if strings.Contains(lowMsg, "quota") || strings.Contains(lowMsg, "exhausted") || strings.Contains(lowMsg, "usage limit") || strings.Contains(lowMsg, "credit balance") || strings.Contains(lowMsg, "billing limit") {
 				return true
 			}
 		}
@@ -722,10 +752,37 @@ func isQuota429(resp *http.Response) bool {
 	return strings.Contains(strings.ToLower(resp.Header.Get("X-RateLimit-Reason")), "quota")
 }
 
+func writeAPIError(w http.ResponseWriter, style APIStyle, status int, code, message string) {
+	if style == APIStyleAnthropic {
+		writeAnthropicError(w, status, code, message)
+		return
+	}
+	writeOpenAIError(w, status, code, message)
+}
+
 func writeOpenAIError(w http.ResponseWriter, status int, code, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"message": message, "type": "invalid_request_error", "param": nil, "code": code}})
+}
+
+func writeAnthropicError(w http.ResponseWriter, status int, code, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]any{"type": "error", "error": map[string]any{"type": anthropicErrorType(status, code), "message": message}})
+}
+
+func anthropicErrorType(status int, code string) string {
+	switch {
+	case status == http.StatusUnauthorized || status == http.StatusForbidden:
+		return "authentication_error"
+	case status == http.StatusTooManyRequests || code == "rate_limit_exceeded":
+		return "rate_limit_error"
+	case status >= 500:
+		return "api_error"
+	default:
+		return "invalid_request_error"
+	}
 }
 
 type SMTPNotifier struct{ cfg SMTPConfig }

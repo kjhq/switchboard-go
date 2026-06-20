@@ -6,18 +6,20 @@
 
 Switchboard Go is a small local proxy for the OpenCode Go API.
 
-It gives OpenAI-compatible tools one stable local endpoint and automatically
-cycles through your upstream OpenCode Go API keys when one is exhausted.
+It gives OpenAI-compatible and Anthropic Messages-compatible tools one stable
+local endpoint and automatically cycles through your upstream OpenCode Go API
+keys when one is exhausted.
 
 Most users should run it on their own computer:
 
 ```text
-OpenAI-compatible app -> http://127.0.0.1:8080/v1 -> OpenCode Go
+OpenAI/Anthropic-compatible app -> http://127.0.0.1:8080/v1 -> OpenCode Go
 ```
 
 ## Why use it?
 
-- One local OpenAI-compatible `/v1/*` endpoint
+- One local `/v1/*` endpoint for OpenAI-compatible and Anthropic Messages
+  requests
 - One proxy API key for your tools
 - Multiple upstream OpenCode Go keys behind the scenes
 - Automatic failover when an upstream key is exhausted
@@ -57,9 +59,34 @@ curl http://127.0.0.1:8080/v1/chat/completions \
   -H "Authorization: Bearer $PROXY_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "minimax-m3",
+    "model": "glm-5.1",
     "messages": [{"role": "user", "content": "Say hello"}],
     "max_tokens": 100
+  }'
+```
+
+## Use it from an Anthropic Messages-compatible client
+
+Anthropic-style clients should use the same base URL and proxy key. Switchboard
+Go authenticates clients with the proxy key, then forwards upstream with the
+current OpenCode Go key in `x-api-key`:
+
+```bash
+export ANTHROPIC_BASE_URL="http://127.0.0.1:8080"
+export ANTHROPIC_API_KEY="$PROXY_API_KEY"
+```
+
+Example request:
+
+```bash
+curl http://127.0.0.1:8080/v1/messages \
+  -H "x-api-key: $PROXY_API_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "minimax-m3",
+    "max_tokens": 100,
+    "messages": [{"role": "user", "content": "Say hello"}]
   }'
 ```
 

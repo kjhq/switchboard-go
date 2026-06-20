@@ -75,7 +75,7 @@ limits:
 | `PROXY_API_KEY` | Yes\* | | API key clients must use to access this proxy. |
 | `OPENCODE_GO_API_KEYS` | Yes\* | | Comma-separated OpenCode Go API keys. |
 | `LISTEN_ADDR` | No | `:8080` | HTTP listen address. Use `127.0.0.1:8080` for local-only access. |
-| `UPSTREAM_BASE_URL` | No | `https://opencode.ai/zen/go/v1` | OpenAI-compatible OpenCode Go upstream base URL. |
+| `UPSTREAM_BASE_URL` | No | `https://opencode.ai/zen/go/v1` | OpenCode Go upstream base URL for OpenAI-compatible and Anthropic Messages-compatible routes. |
 | `MAX_REQUEST_BODY_BYTES` | No | `20971520` | Maximum request body size. Requests above this return `413`. |
 | `SMTP_HOST` | No | | SMTP host for notifications. |
 | `SMTP_PORT` | No | `25` | SMTP port. |

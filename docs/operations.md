@@ -2,10 +2,11 @@
 
 ## How request forwarding works
 
-Clients call this proxy as if it were an OpenAI-compatible API:
+Clients call this proxy as if it were an OpenAI-compatible API or Anthropic
+Messages-compatible API:
 
 ```text
-OpenAI-compatible tool -> Switchboard Go -> https://opencode.ai/zen/go/v1
+OpenAI/Anthropic-compatible tool -> Switchboard Go -> https://opencode.ai/zen/go/v1
 ```
 
 Incoming `/v1` paths are stripped before forwarding to the configured upstream
@@ -14,12 +15,13 @@ base URL:
 ```text
 GET  /v1/models           -> GET  https://opencode.ai/zen/go/v1/models
 POST /v1/chat/completions -> POST https://opencode.ai/zen/go/v1/chat/completions
+POST /v1/messages         -> POST https://opencode.ai/zen/go/v1/messages
 ```
 
 When an upstream key returns a quota/usage-exhausted `429`, Switchboard Go marks
 that key as exhausted, sends a best-effort SMTP notification if configured, and
 retries the same request with the next non-exhausted key. If every key is
-exhausted, it returns an OpenAI-style `429` JSON error.
+exhausted, it returns an error shaped for the request style.
 
 ## Security notes
 
@@ -42,6 +44,9 @@ exhausted, it returns an OpenAI-style `429` JSON error.
 - Hop-by-hop and proxy headers are stripped when forwarding.
 - The proxy sets a compatible default upstream `User-Agent` if the client does
   not provide one. This avoids upstream blocks of generic HTTP clients.
+- OpenAI-compatible requests forward the upstream key as `Authorization:
+  Bearer ...`; Anthropic Messages-compatible requests forward it as
+  `x-api-key`.
 - If an upstream stream begins successfully and then later emits an error, the
   proxy does not recover mid-stream; it only retries before a response is sent.
 - Exhausted keys remain exhausted until the process restarts.
