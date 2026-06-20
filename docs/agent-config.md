@@ -85,32 +85,30 @@ Restart opencode after changing config; running sessions keep the old config.
 
 ## Pi Coding Agent
 
+Pi already has a built-in `opencode-go` provider with model metadata. Reuse that
+provider and only override its endpoint and API key. This avoids maintaining a
+long custom `models` list.
+
 Create or edit `~/.pi/agent/models.json`:
 
 ```json
 {
   "providers": {
-    "switchboard": {
-      "name": "Switchboard",
+    "opencode-go": {
       "baseUrl": "http://127.0.0.1:8080/v1",
-      "api": "openai-completions",
-      "apiKey": "<SWITCHBOARD_PROXY_API_KEY>",
+      "apiKey": "$SWITCHBOARD_PROXY_API_KEY",
       "compat": {
-        "maxTokensField": "max_tokens"
-      },
-      "models": [
-        {
-          "id": "glm-5.1",
-          "name": "GLM-5.1",
-          "reasoning": true,
-          "input": ["text"],
-          "contextWindow": 202752,
-          "maxTokens": 32768
-        }
-      ]
+        "supportsDeveloperRole": false
+      }
     }
   }
 }
+```
+
+Then export the proxy key before starting Pi:
+
+```bash
+export SWITCHBOARD_PROXY_API_KEY="$PROXY_API_KEY"
 ```
 
 Set defaults in `~/.pi/agent/settings.json`, preserving any existing settings
@@ -118,7 +116,7 @@ keys:
 
 ```json
 {
-  "defaultProvider": "switchboard",
+  "defaultProvider": "opencode-go",
   "defaultModel": "glm-5.1"
 }
 ```
@@ -126,7 +124,7 @@ keys:
 Verify:
 
 ```bash
-pi --no-extensions --provider switchboard --model glm-5.1 --no-session --no-tools -p "Reply with exactly: switchboard ok"
+pi --no-extensions --provider opencode-go --model glm-5.1 --no-session --no-tools -p "Reply with exactly: switchboard ok"
 ```
 
 Expected:
@@ -134,3 +132,14 @@ Expected:
 ```text
 switchboard ok
 ```
+
+The `supportsDeveloperRole: false` compatibility flag tells Pi to send its
+instruction message as a standard `system` message instead of OpenAI's newer
+`developer` role. OpenCode Go currently rejects `developer` messages for the
+OpenAI-compatible route, so this flag is required.
+
+This setup exposes Pi's built-in `opencode-go` model list through Switchboard.
+Models that Pi sends through its OpenAI-compatible implementation work with
+Switchboard's `/v1/chat/completions` endpoint. Models that Pi sends through an
+Anthropic Messages implementation require an Anthropic-compatible Switchboard
+route and may not work with the `/v1` OpenAI-compatible proxy.
