@@ -34,9 +34,9 @@ OpenAI-compatible app -> http://127.0.0.1:8080/v1 -> OpenCode Go
 No clone, no install. Just Docker:
 
 ```bash
-KEY=$(openssl rand -hex 32) && echo "PROXY_API_KEY: $KEY" \
-  && curl -sL https://raw.githubusercontent.com/kjhq/switchboard-go/main/docker-compose.yml \
-    | PROXY_API_KEY=$KEY docker compose -f - up -d
+curl -sLo /tmp/switchboard-go.yml https://raw.githubusercontent.com/kjhq/switchboard-go/main/docker-compose.yml \
+  && KEY=$(openssl rand -hex 32) && echo "PROXY_API_KEY: $KEY" \
+  && PROXY_API_KEY=$KEY docker compose -f /tmp/switchboard-go.yml up -d
 ```
 
 Open **http://127.0.0.1:8080/dashboard/** and log in with that key.
