@@ -42,7 +42,7 @@ export async function renderRequests(container, api) {
                 <td>${esc(e.method)}</td>
                 <td style="font-family:monospace;font-size:12px">${esc(e.path)}</td>
                 <td>#${e.key_index}</td>
-                <td><span class="badge ${e.status >= 400 ? 'badge-exhausted' : 'badge-available'}">${e.status}</span></td>
+                <td><span class="badge ${e.status >= 400 ? 'badge-error' : 'badge-available'}">${e.status}</span></td>
                 <td>${e.duration_ms}ms</td>
               </tr>
             `).join('')}

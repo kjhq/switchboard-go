@@ -1,5 +1,15 @@
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
+const stateLabels = {
+  available: 'Active',
+  exhausted: 'Rate limited',
+  unknown: 'Standby'
+};
+
+function stateLabel(state) {
+  return stateLabels[state] || state;
+}
+
 export async function renderKeys(container, api) {
   const render = async () => {
     const res = await api.getKeys();
@@ -17,15 +27,19 @@ export async function renderKeys(container, api) {
       <div id="key-list">
         ${status.keys.map((k, i) => `
           <div class="key-card">
-            <span class="dot dot-${k.state}"></span>
-            <div class="key-info">
-              <strong>${esc(k.name) || `Key ${k.index}`}</strong>
-              <span class="badge badge-${k.state}">${k.state}</span>
-              ${k.current ? '<span class="badge badge-available" style="margin-left:4px">current</span>' : ''}
-              <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;font-family:monospace">
-                ${k.key_prefix || ''}${k.key_suffix ? '...' + k.key_suffix : ''}
+            <div class="key-card-main">
+              <span class="dot dot-${k.state}"></span>
+              <div class="key-info">
+                <div class="key-title">
+                  <strong>${esc(k.name) || `Key ${k.index}`}</strong>
+                  <span class="badge badge-${k.state}">${stateLabel(k.state)}</span>
+                  ${k.current ? '<span class="badge badge-current">current</span>' : ''}
+                </div>
+                <div class="key-id">
+                  ${k.key_prefix || ''}${k.key_suffix ? '...' + k.key_suffix : ''}
+                </div>
+                ${k.last_429_time ? `<div class="key-rate-limit">Rate limited at ${esc(k.last_429_time)}</div>` : ''}
               </div>
-              ${k.last_429_time ? `<div style="font-size:11px;color:var(--error);margin-top:2px">429 at ${esc(k.last_429_time)}</div>` : ''}
             </div>
             <div class="key-actions">
               ${i > 0 ? `<button class="secondary" data-move-up="${i}">↑</button>` : ''}
@@ -47,11 +61,19 @@ export async function renderKeys(container, api) {
       result.innerHTML = 'Validating...';
       const r = await api.validateKey(key);
       if (r.data?.valid) {
-        await api.addKey(key, name);
-        result.innerHTML = '<span style="color:var(--success)">Key added successfully</span>';
-        input.value = '';
-        nameInput.value = '';
-        render();
+        const addRes = await api.addKey(key, name);
+        if (addRes.ok) {
+          const state = addRes.data?.state;
+          const msg = state === 'exhausted'
+            ? 'Key added (currently rate limited). It will be used when capacity returns.'
+            : 'Key added successfully';
+          result.innerHTML = `<span style="color:var(--success)">${esc(msg)}</span>`;
+          input.value = '';
+          nameInput.value = '';
+          render();
+        } else {
+          result.innerHTML = `<span style="color:var(--error)">Failed to add key: ${esc(addRes.data?.error || 'unknown error')}</span>`;
+        }
       } else {
         result.innerHTML = `<span style="color:var(--error)">Invalid key: ${esc(r.data?.error || 'unknown error')}</span>`;
       }

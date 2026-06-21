@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -27,41 +26,15 @@ func TestBearerTokenCaseInsensitive(t *testing.T) {
 	}
 }
 
-func TestIsQuota429(t *testing.T) {
-	resp := &http.Response{StatusCode: 429, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(`{"error":{"message":"quota exceeded","code":"insufficient_quota"}}`))}
-	if !isQuota429(resp) {
-		t.Fatal("expected quota 429")
+func TestIsRateLimited(t *testing.T) {
+	if !isRateLimited(&http.Response{StatusCode: 429}) {
+		t.Fatal("expected 429 to be rate limited")
 	}
-}
-
-func TestIsQuota429NotGenericRateLimit(t *testing.T) {
-	resp := &http.Response{StatusCode: 429, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(`{"error":{"message":"try again","code":"rate_limit_exceeded"}}`))}
-	if isQuota429(resp) {
-		t.Fatal("expected generic rate_limit_exceeded not to count as quota")
+	if isRateLimited(&http.Response{StatusCode: 200}) {
+		t.Fatal("expected 200 not to be rate limited")
 	}
-}
-
-func TestIsQuota429RestoresBody(t *testing.T) {
-	const body = `{"error":{"message":"quota exceeded","code":"insufficient_quota"}}`
-	resp := &http.Response{StatusCode: 429, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(body))}
-	_ = isQuota429(resp)
-	got, _ := io.ReadAll(resp.Body)
-	if string(got) != body {
-		t.Fatalf("body not restored: %q", string(got))
-	}
-}
-
-func TestIsQuota429AnthropicUsageLimit(t *testing.T) {
-	resp := &http.Response{StatusCode: 429, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(`{"type":"error","error":{"type":"rate_limit_error","message":"credit balance is too low"}}`))}
-	if !isQuota429(resp) {
-		t.Fatal("expected anthropic credit balance 429 to count as quota")
-	}
-}
-
-func TestIsQuota429AnthropicGenericRateLimit(t *testing.T) {
-	resp := &http.Response{StatusCode: 429, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(`{"type":"error","error":{"type":"rate_limit_error","message":"rate limit reached"}}`))}
-	if isQuota429(resp) {
-		t.Fatal("expected generic anthropic rate limit not to count as quota")
+	if isRateLimited(nil) {
+		t.Fatal("expected nil response not to be rate limited")
 	}
 }
 

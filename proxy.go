@@ -64,7 +64,7 @@ func (a *App) proxyV1(w http.ResponseWriter, r *http.Request, style APIStyle) {
 			http.Error(w, reqErr.Error(), http.StatusBadGateway)
 			return
 		}
-		if resp.StatusCode == http.StatusTooManyRequests && isQuota429(resp) {
+		if isRateLimited(resp) {
 			_ = resp.Body.Close()
 			a.keys.MarkExhausted(idx)
 			a.recordRequest(r.Method, r.URL.Path, idx, 429, time.Since(start))
@@ -186,32 +186,8 @@ func copyResponse(w http.ResponseWriter, resp *http.Response) {
 	_, _ = io.Copy(w, resp.Body)
 }
 
-func isQuota429(resp *http.Response) bool {
-	if resp.StatusCode != 429 {
-		return false
-	}
-	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-	resp.Body.Close()
-	resp.Body = io.NopCloser(bytes.NewReader(body))
-	var m map[string]any
-	if json.Unmarshal(body, &m) == nil {
-		if e, ok := m["error"].(map[string]any); ok {
-			if code, _ := e["code"].(string); code == "insufficient_quota" || code == "usage_not_included" {
-				return true
-			}
-			typ, _ := e["type"].(string)
-			msg, _ := e["message"].(string)
-			lowType := strings.ToLower(typ)
-			lowMsg := strings.ToLower(msg)
-			if strings.Contains(lowType, "usage") || strings.Contains(lowType, "quota") || strings.Contains(lowType, "freeusagelimit") {
-				return true
-			}
-			if strings.Contains(lowMsg, "quota") || strings.Contains(lowMsg, "exhausted") || strings.Contains(lowMsg, "usage limit") || strings.Contains(lowMsg, "credit balance") || strings.Contains(lowMsg, "billing limit") {
-				return true
-			}
-		}
-	}
-	return strings.Contains(strings.ToLower(resp.Header.Get("X-RateLimit-Reason")), "quota")
+func isRateLimited(resp *http.Response) bool {
+	return resp != nil && resp.StatusCode == http.StatusTooManyRequests
 }
 
 func writeAPIError(w http.ResponseWriter, style APIStyle, status int, code, message string) {
@@ -337,7 +313,7 @@ func (a *App) handleValidateKeys(w http.ResponseWriter, r *http.Request) {
 			resp.Body.Close()
 			a.keys.MarkAvailable(i)
 			res.State = string(KeyAvailable)
-		} else if resp.StatusCode == http.StatusTooManyRequests && isQuota429(resp) {
+		} else if isRateLimited(resp) {
 			io.Copy(io.Discard, resp.Body)
 			resp.Body.Close()
 			a.keys.SetState(i, KeyExhausted)

@@ -2,6 +2,16 @@ import { renderSparkline } from '../charts.js';
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
+const stateLabels = {
+  available: 'Active',
+  exhausted: 'Rate limited',
+  unknown: 'Standby'
+};
+
+function stateLabel(state) {
+  return stateLabels[state] || state;
+}
+
 export async function renderDashboard(container, api) {
   const [statusRes, reqRes, updateRes] = await Promise.all([api.getStatus(), api.getRequests(), api.checkUpdate()]);
   const status = statusRes.data;
@@ -46,7 +56,7 @@ export async function renderDashboard(container, api) {
       <h2>Active Key</h2>
       <div style="display:flex;align-items:center;gap:12px;font-size:18px">
         <span class="dot ${currentDot}"></span>
-        ${currentKey ? `Key ${currentKey.index} (${esc(currentKey.state)})` : 'No active key'}
+        ${currentKey ? `Key ${currentKey.index} — ${esc(stateLabel(currentKey.state))}` : 'No active key'}
       </div>
     </div>
     <div class="card">
@@ -57,9 +67,9 @@ export async function renderDashboard(container, api) {
       <h2>Key Health</h2>
       <div class="key-summary">
         <div class="key-summary-item"><div class="count">${total}</div><div class="label">Total</div></div>
-        <div class="key-summary-item"><div class="count">${available}</div><div class="label" style="color:var(--success)">Available</div></div>
-        <div class="key-summary-item"><div class="count">${exhausted}</div><div class="label" style="color:var(--error)">Exhausted</div></div>
-        <div class="key-summary-item"><div class="count">${unknown}</div><div class="label" style="color:var(--unknown)">Unknown</div></div>
+        <div class="key-summary-item"><div class="count">${available}</div><div class="label" style="color:var(--success)">Active</div></div>
+        <div class="key-summary-item"><div class="count">${exhausted}</div><div class="label" style="color:var(--warning)">Rate limited</div></div>
+        <div class="key-summary-item"><div class="count">${unknown}</div><div class="label" style="color:var(--unknown)">Standby</div></div>
       </div>
     </div>
     <div class="card">

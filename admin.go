@@ -413,8 +413,8 @@ func (a *App) validateModels(key, url string) (model string, state string, valid
 		return "", string(KeyAvailable), true, "", false
 	case resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden:
 		return "", string(KeyUnknown), false, fmt.Sprintf("status %d: invalid key", resp.StatusCode), false
-	case resp.StatusCode == http.StatusTooManyRequests && isQuota429(resp):
-		return "", string(KeyExhausted), false, "quota exhausted", false
+	case isRateLimited(resp):
+		return "", string(KeyExhausted), false, "rate limited", false
 	default:
 		return "", string(KeyUnknown), false, fmt.Sprintf("status %d", resp.StatusCode), false
 	}
@@ -441,14 +441,13 @@ func (a *App) validateWithEndpoint(key, url, method string, body []byte) (state 
 		return string(KeyUnknown), false, err.Error(), true
 	}
 	defer resp.Body.Close()
-	_, _ = io.Copy(io.Discard, resp.Body)
 	switch {
 	case resp.StatusCode >= 200 && resp.StatusCode < 300:
 		return string(KeyAvailable), true, "", false
 	case resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden:
 		return string(KeyUnknown), false, fmt.Sprintf("status %d: invalid key", resp.StatusCode), false
-	case resp.StatusCode == http.StatusTooManyRequests && isQuota429(resp):
-		return string(KeyExhausted), false, "quota exhausted", false
+	case isRateLimited(resp):
+		return string(KeyExhausted), false, "rate limited", false
 	default:
 		return string(KeyUnknown), false, fmt.Sprintf("status %d", resp.StatusCode), false
 	}
