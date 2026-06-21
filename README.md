@@ -7,7 +7,6 @@
 <p align="center">
   <a href="https://github.com/kjhq/switchboard-go/releases"><img src="https://img.shields.io/github/v/release/kjhq/switchboard-go?style=flat-square" alt="Release"></a>
   <a href="https://github.com/kjhq/switchboard-go/actions/workflows/docker-publish.yml"><img src="https://img.shields.io/github/actions/workflow/status/kjhq/switchboard-go/docker-publish.yml?branch=main&style=flat-square&label=docker" alt="Docker"></a>
-  <a href="https://github.com/kjhq/switchboard-go/actions/workflows/release.yml"><img src="https://img.shields.io/github/actions/workflow/status/kjhq/switchboard-go/release.yml?style=flat-square&label=release" alt="Release"></a>
   <a href="https://goreportcard.com/report/github.com/kjhq/switchboard-go"><img src="https://goreportcard.com/badge/github.com/kjhq/switchboard-go?style=flat-square" alt="Go Report Card"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License"></a>
 </p>
@@ -29,14 +28,16 @@ through your upstream OpenCode Go API keys when one is exhausted.
 OpenAI-compatible app -> http://127.0.0.1:8080/v1 -> OpenCode Go
 ```
 
-## Run with Docker (one-liner)
-
-No clone, no install. Just Docker:
+## Run with Docker
 
 ```bash
-curl -sLo /tmp/switchboard-go.yml https://raw.githubusercontent.com/kjhq/switchboard-go/main/docker-compose.yml \
-  && KEY=$(openssl rand -hex 32) && echo "PROXY_API_KEY: $KEY" \
-  && PROXY_API_KEY=$KEY docker compose -f /tmp/switchboard-go.yml up -d
+# Pull the image first so compose doesn't try to build
+docker pull ghcr.io/kjhq/switchboard-go:latest
+
+# Generate a key and start
+KEY=$(openssl rand -hex 32) && echo "PROXY_API_KEY: $KEY" \
+  && curl -sL https://raw.githubusercontent.com/kjhq/switchboard-go/main/docker-compose.yml \
+    | PROXY_API_KEY=$KEY docker compose -f - up -d
 ```
 
 Open **http://127.0.0.1:8080/dashboard/** and log in with that key.
@@ -51,28 +52,6 @@ The original is a CLI-only proxy. This fork adds:
 - **Settings UI** — configure upstream URL, SMTP, and limits from the browser
 - **JSON config** persisted to disk (no YAML dependency)
 - Admin CRUD API for all operations
-
-## Install
-
-Download a binary from GitHub Releases:
-
-```text
-https://github.com/kjhq/switchboard-go/releases
-```
-
-## Quick start
-
-```bash
-export PROXY_API_KEY="replace-with-a-long-random-local-key"
-
-# Optional: seed initial keys on first run (can also add via dashboard)
-export OPENCODE_GO_API_KEYS="sk-first,sk-second,sk-third"
-
-switchboard-go
-```
-
-Then open **http://127.0.0.1:8080/dashboard/** in your browser and log in with your
-`PROXY_API_KEY`.
 
 ## Settings
 
