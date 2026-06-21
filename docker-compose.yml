@@ -1,5 +1,6 @@
 services:
   switchboard-go:
+    image: ghcr.io/kjhq/switchboard-go:latest
     build: .
     ports:
       - "8080:8080"

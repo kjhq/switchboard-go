@@ -60,7 +60,7 @@ changelog:
 
 release:
   github:
-    owner: ArsalanDotMe
+    owner: "{{ .Env.GITHUB_REPOSITORY_OWNER }}"
     name: switchboard-go
   draft: false
   prerelease: auto
