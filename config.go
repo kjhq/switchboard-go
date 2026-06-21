@@ -66,7 +66,7 @@ type Config struct {
 
 func DefaultConfig() Config {
 	return Config{
-		ListenAddr:          ":8080",
+		ListenAddr:          "0.0.0.0:8080",
 		UpstreamBaseURL:     "https://opencode.ai/zen/go/v1",
 		MaxRequestBodyBytes: 20 << 20,
 		RequestLogSize:      500,

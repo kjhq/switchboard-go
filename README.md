@@ -31,13 +31,9 @@ OpenAI-compatible app -> http://127.0.0.1:8080/v1 -> OpenCode Go
 ## Run with Docker
 
 ```bash
-# Pull the image first so compose doesn't try to build
-docker pull ghcr.io/kjhq/switchboard-go:latest
-
-# Generate a key and start
 KEY=$(openssl rand -hex 32) && echo "PROXY_API_KEY: $KEY" \
-  && curl -sL https://raw.githubusercontent.com/kjhq/switchboard-go/main/docker-compose.yml \
-    | PROXY_API_KEY=$KEY docker compose -f - up -d
+  && curl -sLo docker-compose.yml https://raw.githubusercontent.com/kjhq/switchboard-go/main/docker-compose.yml \
+  && PROXY_API_KEY=$KEY docker compose up -d
 ```
 
 Open **http://127.0.0.1:8080/dashboard/** and log in with that key.
