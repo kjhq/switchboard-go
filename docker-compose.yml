@@ -1,7 +1,6 @@
 services:
   switchboard-go:
     image: ghcr.io/kjhq/switchboard-go:latest
-    pull_policy: always
     ports:
       - "8080:8080"
     environment:
