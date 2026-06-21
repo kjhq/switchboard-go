@@ -1,2 +1,5 @@
 dist/
 switchboard-go
+.env
+.superpowers/
+docs/superpowers/

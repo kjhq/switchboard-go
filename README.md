@@ -10,20 +10,18 @@ It gives OpenAI-compatible and Anthropic Messages-compatible tools one stable
 local endpoint and automatically cycles through your upstream OpenCode Go API
 keys when one is exhausted.
 
-Most users should run it on their own computer:
-
 ```text
 OpenAI/Anthropic-compatible app -> http://127.0.0.1:8080/v1 -> OpenCode Go
 ```
 
 ## Why use it?
 
-- One local `/v1/*` endpoint for OpenAI-compatible and Anthropic Messages
-  requests
+- One local `/v1/*` endpoint for OpenAI-compatible and Anthropic Messages requests
 - One proxy API key for your tools
 - Multiple upstream OpenCode Go keys behind the scenes
 - Automatic failover when an upstream key is exhausted
-- Optional YAML config, Docker, admin status, and SMTP alerts
+- Web dashboard at `/dashboard/` for key management, monitoring, and settings
+- JSON config file (no YAML), optional SMTP alerts
 
 ## Install
 
@@ -37,11 +35,38 @@ https://github.com/ArsalanDotMe/switchboard-go/releases
 
 ```bash
 export PROXY_API_KEY="replace-with-a-long-random-local-key"
+
+# First run — seed initial keys (optional, can add via dashboard later)
 export OPENCODE_GO_API_KEYS="sk-first,sk-second,sk-third"
-export LISTEN_ADDR="127.0.0.1:8080"
 
 switchboard-go
 ```
+
+Then open http://127.0.0.1:8080/dashboard/ in your browser.
+
+## Settings
+
+Only `PROXY_API_KEY` is required as an environment variable. Everything else is
+configured through the dashboard or stored in `~/.config/switchboard-go/config.json`.
+
+| Env var | Required | Description |
+|---|---|---|
+| `PROXY_API_KEY` | Yes | Key clients use to access Switchboard Go. |
+| `OPENCODE_GO_API_KEYS` | No | Seeds keys on first run (ignored afterwards). |
+
+On first run, if no config file exists, the proxy starts with default settings
+and 0 upstream keys. Add keys through the dashboard. If `OPENCODE_GO_API_KEYS`
+is set, those keys are seeded into the config file automatically.
+
+## Dashboard
+
+Open `http://127.0.0.1:8080/dashboard/` in your browser. You'll be prompted for
+your `PROXY_API_KEY`. The dashboard has four pages:
+
+- **Dashboard** — active key indicator, request rate sparkline, key health summary
+- **Keys** — add/delete/reorder upstream API keys with clipboard validation
+- **Requests** — sortable, paginated request log (method, path, key#, status, duration)
+- **Settings** — listen address, upstream URL, SMTP config, dark/light theme
 
 ## Use it from an OpenAI-compatible client
 
@@ -52,78 +77,38 @@ export OPENAI_BASE_URL="http://127.0.0.1:8080/v1"
 export OPENAI_API_KEY="$PROXY_API_KEY"
 ```
 
-Example request:
-
-```bash
-curl http://127.0.0.1:8080/v1/chat/completions \
-  -H "Authorization: Bearer $PROXY_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "glm-5.1",
-    "messages": [{"role": "user", "content": "Say hello"}],
-    "max_tokens": 100
-  }'
-```
-
 ## Use it from an Anthropic Messages-compatible client
-
-Anthropic-style clients should use the same base URL and proxy key. Switchboard
-Go authenticates clients with the proxy key, then forwards upstream with the
-current OpenCode Go key in `x-api-key`:
 
 ```bash
 export ANTHROPIC_BASE_URL="http://127.0.0.1:8080"
 export ANTHROPIC_API_KEY="$PROXY_API_KEY"
 ```
 
-Example request:
-
-```bash
-curl http://127.0.0.1:8080/v1/messages \
-  -H "x-api-key: $PROXY_API_KEY" \
-  -H "anthropic-version: 2023-06-01" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "minimax-m3",
-    "max_tokens": 100,
-    "messages": [{"role": "user", "content": "Say hello"}]
-  }'
-```
-
-For opencode and Pi Coding Agent examples, see
-[docs/agent-config.md](docs/agent-config.md).
-
-## Common settings
-
-| Variable | Required | Default | Description |
-| --- | --- | --- | --- |
-| `PROXY_API_KEY` | Yes | | Key clients use to access Switchboard Go. |
-| `OPENCODE_GO_API_KEYS` | Yes | | Comma-separated upstream OpenCode Go API keys. |
-| `LISTEN_ADDR` | No | `:8080` | Use `127.0.0.1:8080` for local-only access. |
-| `UPSTREAM_BASE_URL` | No | `https://opencode.ai/zen/go/v1` | OpenCode Go upstream base URL. |
-
-YAML config is also supported. See
-[docs/configuration.md](docs/configuration.md).
-
-## Admin endpoints
+## Admin API
 
 Use `Authorization: Bearer $PROXY_API_KEY`:
 
-- `GET /admin/status`
-- `POST /admin/validate-keys`
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/admin/status` | Key states and active index |
+| `GET` | `/admin/keys` | Full key list with states |
+| `POST` | `/admin/keys` | Add a key (validates first) |
+| `DELETE` | `/admin/keys/{index}` | Remove a key |
+| `PUT` | `/admin/keys/reorder` | Reorder keys |
+| `GET` | `/admin/settings` | Current config (password masked) |
+| `PUT` | `/admin/settings` | Update config |
+| `GET` | `/admin/requests` | Request log entries |
+| `POST` | `/admin/validate-key` | Validate a single key |
+| `POST` | `/admin/validate-keys` | Validate all configured keys |
 
 Health checks:
 
 - `GET /healthz`
 - `GET /readyz`
 
-See [docs/admin-api.md](docs/admin-api.md).
-
 ## More docs
 
-- [Configuration](docs/configuration.md)
 - [Agent/client setup](docs/agent-config.md)
-- [Admin API](docs/admin-api.md)
 - [Docker](docs/docker.md)
 - [systemd deployment](docs/deployment.md)
 - [SMTP notifications](docs/smtp.md)

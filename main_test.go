@@ -6,14 +6,12 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
 
 func TestKeyManagerNoCurrentWhenExhausted(t *testing.T) {
-	km := NewKeyManager([]string{"a"})
+	km := NewKeyManager([]string{"a"}, nil)
 	km.MarkExhausted(0)
 	if _, _, ok := km.Current(); ok {
 		t.Fatal("expected no current key")
@@ -68,7 +66,7 @@ func TestIsQuota429AnthropicGenericRateLimit(t *testing.T) {
 }
 
 func TestRequestTooLargeReturns413(t *testing.T) {
-	app := newApp(Config{ProxyAPIKey: "p", UpstreamAPIKeys: []string{"u"}, MaxRequestBodyBytes: 4})
+	app := newApp(Config{ProxyAPIKey: "p", UpstreamAPIKeys: []KeyEntry{{Key: "u"}}, MaxRequestBodyBytes: 4})
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader([]byte("12345")))
 	req.Header.Set("Authorization", "Bearer p")
 	rec := httptest.NewRecorder()
@@ -88,7 +86,7 @@ func TestRootOpenAIPathProxies(t *testing.T) {
 	}))
 	defer upstream.Close()
 
-	app := newApp(Config{ProxyAPIKey: "p", UpstreamAPIKeys: []string{"u"}, UpstreamBaseURL: upstream.URL, MaxRequestBodyBytes: 1024})
+	app := newApp(Config{ProxyAPIKey: "p", UpstreamAPIKeys: []KeyEntry{{Key: "u"}}, UpstreamBaseURL: upstream.URL, MaxRequestBodyBytes: 1024})
 	req := httptest.NewRequest(http.MethodPost, "/chat/completions", strings.NewReader(`{"model":"glm-5.1","messages":[]}`))
 	req.Header.Set("Authorization", "Bearer p")
 	rec := httptest.NewRecorder()
@@ -109,7 +107,7 @@ func TestDoUpstreamSetsDefaultUserAgent(t *testing.T) {
 	}))
 	defer upstream.Close()
 
-	app := newApp(Config{ProxyAPIKey: "p", UpstreamAPIKeys: []string{"u"}, UpstreamBaseURL: upstream.URL})
+	app := newApp(Config{ProxyAPIKey: "p", UpstreamAPIKeys: []KeyEntry{{Key: "u"}}, UpstreamBaseURL: upstream.URL})
 	req := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
 	resp, err := app.doUpstream(req.Context(), req, nil, "u", APIStyleOpenAI)
 	if err != nil {
@@ -133,7 +131,7 @@ func TestDoUpstreamAnthropicSetsHeaders(t *testing.T) {
 	}))
 	defer upstream.Close()
 
-	app := newApp(Config{ProxyAPIKey: "p", UpstreamAPIKeys: []string{"u"}, UpstreamBaseURL: upstream.URL})
+	app := newApp(Config{ProxyAPIKey: "p", UpstreamAPIKeys: []KeyEntry{{Key: "u"}}, UpstreamBaseURL: upstream.URL})
 	req := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{"model":"minimax-m3","messages":[]}`))
 	req.Header.Set("x-api-key", "p")
 	req.Header.Set("anthropic-version", "2023-06-01")
@@ -165,7 +163,7 @@ func TestProxyAnthropicMessagesCyclesKeys(t *testing.T) {
 	}))
 	defer upstream.Close()
 
-	app := newApp(Config{ProxyAPIKey: "p", UpstreamAPIKeys: []string{"bad", "good"}, UpstreamBaseURL: upstream.URL, MaxRequestBodyBytes: 1024})
+	app := newApp(Config{ProxyAPIKey: "p", UpstreamAPIKeys: []KeyEntry{{Key: "bad"}, {Key: "good"}}, UpstreamBaseURL: upstream.URL, MaxRequestBodyBytes: 1024})
 	req := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{"model":"minimax-m3","messages":[]}`))
 	req.Header.Set("x-api-key", "p")
 	req.Header.Set("anthropic-version", "2023-06-01")
@@ -180,7 +178,7 @@ func TestProxyAnthropicMessagesCyclesKeys(t *testing.T) {
 }
 
 func TestAuthFailureReturnsOpenAIJSON(t *testing.T) {
-	app := newApp(Config{ProxyAPIKey: "p", UpstreamAPIKeys: []string{"u"}, UpstreamBaseURL: "http://example.com", MaxRequestBodyBytes: 1})
+	app := newApp(Config{ProxyAPIKey: "p", UpstreamAPIKeys: []KeyEntry{{Key: "u"}}, UpstreamBaseURL: "http://example.com", MaxRequestBodyBytes: 1})
 	req := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
 	rec := httptest.NewRecorder()
 	app.ServeHTTP(rec, req)
@@ -200,7 +198,7 @@ func TestAuthFailureReturnsOpenAIJSON(t *testing.T) {
 }
 
 func TestAuthFailureReturnsAnthropicJSON(t *testing.T) {
-	app := newApp(Config{ProxyAPIKey: "p", UpstreamAPIKeys: []string{"u"}, UpstreamBaseURL: "http://example.com", MaxRequestBodyBytes: 1})
+	app := newApp(Config{ProxyAPIKey: "p", UpstreamAPIKeys: []KeyEntry{{Key: "u"}}, UpstreamBaseURL: "http://example.com", MaxRequestBodyBytes: 1})
 	req := httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
 	req.Header.Set("anthropic-version", "2023-06-01")
 	rec := httptest.NewRecorder()
@@ -219,7 +217,7 @@ func TestAuthFailureReturnsAnthropicJSON(t *testing.T) {
 }
 
 func TestRootAnthropicAuthFailureReturnsAnthropicJSON(t *testing.T) {
-	app := newApp(Config{ProxyAPIKey: "p", UpstreamAPIKeys: []string{"u"}, UpstreamBaseURL: "http://example.com", MaxRequestBodyBytes: 1})
+	app := newApp(Config{ProxyAPIKey: "p", UpstreamAPIKeys: []KeyEntry{{Key: "u"}}, UpstreamBaseURL: "http://example.com", MaxRequestBodyBytes: 1})
 	req := httptest.NewRequest(http.MethodPost, "/messages", nil)
 	req.Header.Set("anthropic-version", "2023-06-01")
 	rec := httptest.NewRecorder()
@@ -234,15 +232,6 @@ func TestRootAnthropicAuthFailureReturnsAnthropicJSON(t *testing.T) {
 	errObj, ok := payload["error"].(map[string]any)
 	if payload["type"] != "error" || !ok || errObj["type"] != "authentication_error" {
 		t.Fatalf("unexpected payload: %#v", payload)
-	}
-}
-
-func TestValidateConfigHelper(t *testing.T) {
-	if err := validateConfig(Config{}); err == nil {
-		t.Fatal("expected error")
-	}
-	if err := validateConfig(Config{ProxyAPIKey: "p", UpstreamAPIKeys: []string{"u"}, UpstreamBaseURL: "http://x", MaxRequestBodyBytes: 1}); err != nil {
-		t.Fatal(err)
 	}
 }
 
@@ -264,7 +253,7 @@ func TestValidateKeysEndpoint(t *testing.T) {
 		_, _ = w.Write([]byte(`{"error":{"message":"quota exceeded","code":"insufficient_quota"}}`))
 	}))
 	defer upstream.Close()
-	app := newApp(Config{ProxyAPIKey: "p", UpstreamAPIKeys: []string{"good", "bad"}, UpstreamBaseURL: upstream.URL, MaxRequestBodyBytes: 1})
+	app := newApp(Config{ProxyAPIKey: "p", UpstreamAPIKeys: []KeyEntry{{Key: "good"}, {Key: "bad"}}, UpstreamBaseURL: upstream.URL, MaxRequestBodyBytes: 1})
 	req := httptest.NewRequest(http.MethodPost, "/admin/validate-keys", nil)
 	req.Header.Set("Authorization", "Bearer p")
 	rec := httptest.NewRecorder()
@@ -293,7 +282,7 @@ func TestReadyzUnauthenticated(t *testing.T) {
 		http.NotFound(w, r)
 	}))
 	defer upstream.Close()
-	app := newApp(Config{ProxyAPIKey: "p", UpstreamAPIKeys: []string{"good"}, UpstreamBaseURL: upstream.URL, MaxRequestBodyBytes: 1})
+	app := newApp(Config{ProxyAPIKey: "p", UpstreamAPIKeys: []KeyEntry{{Key: "good"}}, UpstreamBaseURL: upstream.URL, MaxRequestBodyBytes: 1})
 	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 	rec := httptest.NewRecorder()
 	app.ServeHTTP(rec, req)
@@ -302,75 +291,4 @@ func TestReadyzUnauthenticated(t *testing.T) {
 	}
 }
 
-func TestLoadConfigFromYAML(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "config.yaml")
-	content := []byte(`server:
-  listen_addr: "127.0.0.1:9090"
-  proxy_api_key: "yaml-proxy"
-upstream:
-  base_url: "https://example.com/v1"
-  api_keys: ["k1", "k2"]
-smtp:
-  host: "smtp.example.com"
-  port: 587
-  tls: false
-  starttls: true
-limits:
-  max_request_body_bytes: 1234
-`)
-	if err := os.WriteFile(path, content, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("SWITCHBOARD_GO_CONFIG", path)
-	t.Setenv("PROXY_API_KEY", "env-proxy")
-	t.Setenv("OPENCODE_GO_API_KEYS", "env1,env2")
-	cfg, err := loadConfig()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cfg.ListenAddr != "127.0.0.1:9090" || cfg.ProxyAPIKey != "env-proxy" || cfg.UpstreamBaseURL != "https://example.com/v1" || cfg.MaxRequestBodyBytes != 1234 {
-		t.Fatalf("unexpected cfg: %+v", cfg)
-	}
-}
 
-func TestLoadConfigExplicitInvalidPathErrors(t *testing.T) {
-	t.Setenv("SWITCHBOARD_GO_CONFIG", "/does/not/exist.yaml")
-	if _, err := loadConfig(); err == nil {
-		t.Fatal("expected error")
-	}
-}
-
-func TestLoadConfigExplicitInvalidYAMLErrors(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "config.yaml")
-	if err := os.WriteFile(path, []byte("server: ["), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("SWITCHBOARD_GO_CONFIG", path)
-	if _, err := loadConfig(); err == nil {
-		t.Fatal("expected error")
-	}
-}
-
-func TestEnvOverridesYAML(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "config.yaml")
-	if err := os.WriteFile(path, []byte(`server: {listen_addr: "127.0.0.1:1", proxy_api_key: "yaml"}
-upstream: {base_url: "https://yaml", api_keys: ["yaml1"]}
-`), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("SWITCHBOARD_GO_CONFIG", path)
-	t.Setenv("PROXY_API_KEY", "env")
-	t.Setenv("OPENCODE_GO_API_KEYS", "e1,e2")
-	t.Setenv("LISTEN_ADDR", "0.0.0.0:9999")
-	t.Setenv("MAX_REQUEST_BODY_BYTES", "99")
-	cfg, err := loadConfig()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cfg.ListenAddr != "0.0.0.0:9999" || cfg.ProxyAPIKey != "env" || len(cfg.UpstreamAPIKeys) != 2 || cfg.MaxRequestBodyBytes != 99 {
-		t.Fatalf("unexpected cfg: %+v", cfg)
-	}
-}
