@@ -31,4 +31,6 @@ export class Api {
   getSettings() { return this.request('GET', '/admin/settings'); }
   updateSettings(data) { return this.request('PUT', '/admin/settings', data); }
   getRequests() { return this.request('GET', '/admin/requests'); }
+  checkUpdate() { return this.request('GET', '/admin/update-check'); }
+  runUpdate() { return this.request('POST', '/admin/update'); }
 }

@@ -27,6 +27,8 @@ func getDashboardFS() (fs.FS, error) {
 	return fs.Sub(dashboardFiles, "dashboard")
 }
 
+var Version = "dev"
+
 type APIStyle int
 
 const (

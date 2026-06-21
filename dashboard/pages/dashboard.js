@@ -3,9 +3,10 @@ import { renderSparkline } from '../charts.js';
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
 export async function renderDashboard(container, api) {
-  const [statusRes, reqRes] = await Promise.all([api.getStatus(), api.getRequests()]);
+  const [statusRes, reqRes, updateRes] = await Promise.all([api.getStatus(), api.getRequests(), api.checkUpdate()]);
   const status = statusRes.data;
   const requests = reqRes.data;
+  const update = updateRes.data;
 
   const total = status.keys.length;
   const available = status.keys.filter(k => k.state === 'available').length;
@@ -25,7 +26,21 @@ export async function renderDashboard(container, api) {
   const currentKey = status.keys.find(k => k.current);
   const currentDot = currentKey ? `dot-${currentKey.state}` : 'dot-unknown';
 
+  let updateBanner = '';
+  if (update && update.update_available) {
+    updateBanner = `
+      <div class="update-banner" id="update-banner">
+        <span>📦 Update available: <strong>${esc(update.latest)}</strong> (current: ${esc(update.current)})</span>
+        <div class="update-banner-actions">
+          <button class="primary" id="btn-update">Update & Restart</button>
+          <button class="secondary" id="btn-dismiss-update">Dismiss</button>
+        </div>
+        <span id="update-status"></span>
+      </div>`;
+  }
+
   container.innerHTML = `
+    ${updateBanner}
     <h2 style="margin-bottom:20px">Dashboard</h2>
     <div class="card">
       <h2>Active Key</h2>
@@ -66,6 +81,26 @@ export async function renderDashboard(container, api) {
       </table>
     </div>
   `;
+
+  document.getElementById('btn-update')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-update');
+    const status = document.getElementById('update-status');
+    btn.disabled = true;
+    status.textContent = 'Pulling image and restarting...';
+    const r = await api.runUpdate();
+    if (r.ok) {
+      status.textContent = 'Updated! Reloading...';
+      setTimeout(() => location.reload(), 2000);
+    } else {
+      status.textContent = `Update failed: ${r.data?.error || 'unknown error'}`;
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById('btn-dismiss-update')?.addEventListener('click', () => {
+    const banner = document.getElementById('update-banner');
+    if (banner) banner.style.display = 'none';
+  });
 
   const canvas = document.getElementById('sparkline');
   if (canvas) renderSparkline(canvas, buckets);

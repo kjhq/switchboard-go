@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -59,6 +60,8 @@ func setupMux(a *App) *http.ServeMux {
 	mux.HandleFunc("GET /admin/requests", adminAuth(a, a.handleGetRequests))
 	mux.HandleFunc("POST /admin/validate-key", adminAuth(a, a.handleValidateSingleKey))
 	mux.HandleFunc("POST /admin/validate-keys", adminAuth(a, a.handleValidateKeys))
+	mux.HandleFunc("GET /admin/update-check", adminAuth(a, a.handleUpdateCheck))
+	mux.HandleFunc("POST /admin/update", adminAuth(a, a.handleUpdate))
 
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -442,4 +445,71 @@ func (a *App) validateWithEndpoint(key, url, method string, body []byte) (state 
 	default:
 		return string(KeyUnknown), false, fmt.Sprintf("status %d", resp.StatusCode), false
 	}
+}
+
+type releaseInfo struct {
+	TagName string `json:"tag_name"`
+}
+
+var userAgent = "switchboard-go"
+
+func (a *App) handleUpdateCheck(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet,
+		"https://api.github.com/repos/kjhq/switchboard-go/releases/latest", nil)
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("User-Agent", userAgent)
+
+	resp, err := a.client.Do(req)
+	if err != nil {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"current": Version, "latest": "", "update_available": false,
+			"error": "failed to check updates",
+		})
+		return
+	}
+	defer resp.Body.Close()
+
+	var rel releaseInfo
+	if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil || rel.TagName == "" {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"current": Version, "latest": "", "update_available": false,
+			"error": "failed to parse release info",
+		})
+		return
+	}
+
+	available := rel.TagName != Version && Version != "dev"
+	writeJSON(w, http.StatusOK, map[string]any{
+		"current":          Version,
+		"latest":           rel.TagName,
+		"update_available": available,
+	})
+}
+
+func (a *App) handleUpdate(w http.ResponseWriter, r *http.Request) {
+	composePath := a.config.DockerComposePath
+
+	pull := exec.Command("docker", "pull", "ghcr.io/kjhq/switchboard-go:latest")
+	if out, err := pull.CombinedOutput(); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{
+			"status": "error", "error": "pull failed: " + string(out),
+		})
+		return
+	}
+
+	restart := exec.Command("docker", "compose", "-f", composePath, "up", "-d")
+	if out, err := restart.CombinedOutput(); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{
+			"status": "error", "error": "restart failed: " + string(out),
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":  "updated",
+		"version": "latest",
+	})
 }

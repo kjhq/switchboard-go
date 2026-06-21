@@ -7,4 +7,7 @@ services:
       - PROXY_API_KEY=${PROXY_API_KEY}
       - OPENCODE_GO_API_KEYS=${OPENCODE_GO_API_KEYS:-}
       - SWITCHBOARD_GO_CONFIG=/tmp/config.json
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./docker-compose.yml:/docker-compose.yml
     restart: unless-stopped

@@ -10,6 +10,9 @@
   --error: #e74c3c;
   --warning: #f39c12;
   --unknown: #95a5a6;
+  --warning-bg: #fff3cd;
+  --warning-border: #ffc107;
+  --warning-text: #856404;
 }
 [data-theme="dark"] {
   --bg: #0f0f23;
@@ -67,6 +70,22 @@ body {
 }
 .sidebar .disconnected.visible { display: block; }
 .content { flex: 1; padding: 24px 32px; max-width: 1200px; }
+
+.update-banner {
+  background: var(--warning-bg, #fff3cd);
+  border: 1px solid var(--warning-border, #ffc107);
+  color: var(--warning-text, #856404);
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.update-banner-actions { display: flex; gap: 8px; margin-left: auto; }
+#update-status { font-size: 13px; color: var(--text-secondary); }
+
 .card {
   background: var(--bg-card);
   border: 1px solid var(--border);

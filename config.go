@@ -54,13 +54,14 @@ type Config struct {
 	UpstreamAPIKeys     []KeyEntry `json:"upstream_api_keys"`
 	MaxRequestBodyBytes int64      `json:"max_request_body_bytes"`
 	RequestLogSize      int        `json:"request_log_size"`
+	DockerComposePath   string     `json:"-"`
 	SMTPHost            string     `json:"smtp_host"`
 	SMTPPort            int        `json:"smtp_port"`
 	SMTPUsername        string     `json:"smtp_username"`
 	SMTPPassword        string     `json:"smtp_password"`
 	SMTPFrom            string     `json:"smtp_from"`
 	SMTPTo              string     `json:"smtp_to"`
-	SMTPTLS             bool     `json:"smtp_tls"`
+	SMTPTLS             bool       `json:"smtp_tls"`
 	SMTPStartTLS        bool       `json:"smtp_starttls"`
 }
 
@@ -71,6 +72,7 @@ func DefaultConfig() Config {
 		MaxRequestBodyBytes: 20 << 20,
 		RequestLogSize:      500,
 		SMTPPort:            25,
+		DockerComposePath:   "/docker-compose.yml",
 	}
 }
 
@@ -92,6 +94,10 @@ func LoadConfig() (Config, error) {
 		return Config{}, fmt.Errorf("PROXY_API_KEY is required")
 	}
 	cfg.ProxyAPIKey = proxyKey
+
+	if cp := strings.TrimSpace(os.Getenv("COMPOSE_FILE_PATH")); cp != "" {
+		cfg.DockerComposePath = cp
+	}
 
 	path := ConfigPath()
 	if path == "" {
