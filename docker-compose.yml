@@ -10,4 +10,8 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./docker-compose.yml:/docker-compose.yml
+      - switchboard-config:/tmp
     restart: unless-stopped
+
+volumes:
+  switchboard-config:
