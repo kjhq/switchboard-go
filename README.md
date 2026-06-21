@@ -4,31 +4,48 @@
 
 <h1 align="center">Switchboard Go</h1>
 
-Switchboard Go is a small local proxy for the OpenCode Go API.
+<p align="center">
+  <a href="https://github.com/kjhq/switchboard-go/releases"><img src="https://img.shields.io/github/v/release/kjhq/switchboard-go?style=flat-square" alt="Release"></a>
+  <a href="https://github.com/kjhq/switchboard-go/actions/workflows/docker-publish.yml"><img src="https://img.shields.io/github/actions/workflow/status/kjhq/switchboard-go/docker-publish.yml?branch=main&style=flat-square&label=docker" alt="Docker"></a>
+  <a href="https://github.com/kjhq/switchboard-go/actions/workflows/release.yml"><img src="https://img.shields.io/github/actions/workflow/status/kjhq/switchboard-go/release.yml?style=flat-square&label=release" alt="Release"></a>
+  <a href="https://goreportcard.com/report/github.com/kjhq/switchboard-go"><img src="https://goreportcard.com/badge/github.com/kjhq/switchboard-go?style=flat-square" alt="Go Report Card"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License"></a>
+</p>
 
-It gives OpenAI-compatible and Anthropic Messages-compatible tools one stable
-local endpoint and automatically cycles through your upstream OpenCode Go API
-keys when one is exhausted.
+<p align="center">
+  Multi-key reverse proxy for OpenCode Go with a web dashboard.
+  <br>
+  Rotate API keys automatically. Manage everything from the browser.
+</p>
+
+A fork of [ArsalanDotMe/switchboard-go](https://github.com/ArsalanDotMe/switchboard-go) that adds a
+full web dashboard for key management, monitoring, and settings.
+
+Switchboard Go is a small local proxy for the OpenCode Go API. It gives
+OpenAI-compatible tools one stable local endpoint and automatically cycles
+through your upstream OpenCode Go API keys when one is exhausted.
 
 ```text
-OpenAI/Anthropic-compatible app -> http://127.0.0.1:8080/v1 -> OpenCode Go
+OpenAI-compatible app -> http://127.0.0.1:8080/v1 -> OpenCode Go
 ```
 
-## Why use it?
+## Why this fork?
 
-- One local `/v1/*` endpoint for OpenAI-compatible and Anthropic Messages requests
-- One proxy API key for your tools
-- Multiple upstream OpenCode Go keys behind the scenes
-- Automatic failover when an upstream key is exhausted
-- Web dashboard at `/dashboard/` for key management, monitoring, and settings
-- JSON config file (no YAML), optional SMTP alerts
+The original is a CLI-only proxy. This fork adds:
+
+- **Web dashboard** at `/dashboard/` — manage keys, monitor request logs, adjust settings
+- **Key management UI** — add/delete/reorder keys with validation, naming, and clipboard paste
+- **Request log** — live ring buffer of proxied requests with status, timing, and key assignment
+- **Settings UI** — configure upstream URL, SMTP, and limits from the browser
+- **JSON config** persisted to disk (no YAML dependency)
+- Admin CRUD API for all operations
 
 ## Install
 
 Download a binary from GitHub Releases:
 
 ```text
-https://github.com/ArsalanDotMe/switchboard-go/releases
+https://github.com/kjhq/switchboard-go/releases
 ```
 
 ## Quick start
@@ -36,13 +53,14 @@ https://github.com/ArsalanDotMe/switchboard-go/releases
 ```bash
 export PROXY_API_KEY="replace-with-a-long-random-local-key"
 
-# First run — seed initial keys (optional, can add via dashboard later)
+# Optional: seed initial keys on first run (can also add via dashboard)
 export OPENCODE_GO_API_KEYS="sk-first,sk-second,sk-third"
 
 switchboard-go
 ```
 
-Then open http://127.0.0.1:8080/dashboard/ in your browser.
+Then open **http://127.0.0.1:8080/dashboard/** in your browser and log in with your
+`PROXY_API_KEY`.
 
 ## Settings
 
@@ -61,12 +79,12 @@ is set, those keys are seeded into the config file automatically.
 ## Dashboard
 
 Open `http://127.0.0.1:8080/dashboard/` in your browser. You'll be prompted for
-your `PROXY_API_KEY`. The dashboard has four pages:
+your `PROXY_API_KEY`. Four pages:
 
 - **Dashboard** — active key indicator, request rate sparkline, key health summary
 - **Keys** — add/delete/reorder upstream API keys with clipboard validation
 - **Requests** — sortable, paginated request log (method, path, key#, status, duration)
-- **Settings** — listen address, upstream URL, SMTP config, dark/light theme
+- **Settings** — listen address, upstream URL, SMTP config
 
 ## Use it from an OpenAI-compatible client
 
@@ -75,13 +93,6 @@ Use the proxy key, not your upstream OpenCode Go key:
 ```bash
 export OPENAI_BASE_URL="http://127.0.0.1:8080/v1"
 export OPENAI_API_KEY="$PROXY_API_KEY"
-```
-
-## Use it from an Anthropic Messages-compatible client
-
-```bash
-export ANTHROPIC_BASE_URL="http://127.0.0.1:8080"
-export ANTHROPIC_API_KEY="$PROXY_API_KEY"
 ```
 
 ## Admin API
