@@ -99,8 +99,8 @@ func TestAdminAddInvalidKey(t *testing.T) {
 	}
 	var resp map[string]any
 	json.Unmarshal(rec.Body.Bytes(), &resp)
-	if resp["valid"] != false {
-		t.Fatalf("expected valid=false for exhausted key")
+	if resp["valid"] != true {
+		t.Fatalf("expected valid=true for exhausted key (key is valid, just rate limited)")
 	}
 }
 

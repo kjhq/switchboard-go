@@ -9,8 +9,8 @@ import (
 
 func TestConfigDefaults(t *testing.T) {
 	cfg := DefaultConfig()
-	if cfg.ListenAddr != ":8080" {
-		t.Fatalf("expected :8080, got %s", cfg.ListenAddr)
+	if cfg.ListenAddr != "0.0.0.0:8080" {
+		t.Fatalf("expected 0.0.0.0:8080, got %s", cfg.ListenAddr)
 	}
 	if cfg.UpstreamBaseURL != "https://opencode.ai/zen/go/v1" {
 		t.Fatalf("unexpected base url")
@@ -31,7 +31,7 @@ func TestLoadConfigCreatesDefaultsOnFirstRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.ListenAddr != ":8080" {
+	if cfg.ListenAddr != "0.0.0.0:8080" {
 		t.Fatalf("expected defaults after first run")
 	}
 	if len(cfg.UpstreamAPIKeys) != 0 {

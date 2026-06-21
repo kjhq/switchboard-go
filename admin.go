@@ -133,16 +133,15 @@ func (a *App) handleAddKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	idx := a.keys.AddKey(input.Key, input.Name)
-	if state == string(KeyExhausted) {
-		a.keys.SetState(idx, KeyExhausted)
-	} else if !valid {
+	if !valid && state != string(KeyExhausted) {
 		a.keys.SetState(idx, KeyUnknown)
 	}
 
+	isValid := valid || state == string(KeyExhausted)
 	resp := AddKeyResponse{
 		Index: idx,
 		State: state,
-		Valid: valid,
+		Valid: isValid,
 		Error: errStr,
 		Keys:  a.keys.Status().Keys,
 	}
@@ -350,7 +349,8 @@ func (a *App) handleValidateSingleKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	state, valid, errStr, _ := a.validateSingleKey(input.Key)
-	resp := map[string]any{"state": state, "valid": valid}
+	isValid := valid || state == string(KeyExhausted)
+	resp := map[string]any{"state": state, "valid": isValid}
 	if errStr != "" {
 		resp["error"] = errStr
 	}
