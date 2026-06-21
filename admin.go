@@ -131,17 +131,23 @@ func (a *App) handleAddKey(w http.ResponseWriter, r *http.Request) {
 		writeOpenAIError(w, http.StatusBadGateway, "validation_failed", errStr)
 		return
 	}
+
+	isValid := valid || state == string(KeyExhausted)
+	if !isValid {
+		writeOpenAIError(w, http.StatusBadRequest, "invalid_key", errStr)
+		return
+	}
+
 	newEntries := append(a.keys.KeyEntries(), KeyEntry{Key: input.Key, Name: input.Name})
 	if err := a.saveKeyConfig(newEntries); err != nil {
 		writeOpenAIError(w, http.StatusInternalServerError, "save_failed", err.Error())
 		return
 	}
 	idx := a.keys.AddKey(input.Key, input.Name)
-	if !valid && state != string(KeyExhausted) {
+	if !valid && state == string(KeyExhausted) {
 		a.keys.SetState(idx, KeyUnknown)
 	}
 
-	isValid := valid || state == string(KeyExhausted)
 	resp := AddKeyResponse{
 		Index: idx,
 		State: state,

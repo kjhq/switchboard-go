@@ -198,10 +198,22 @@ func TestAdminAddKeyPersistsToConfig(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.json")
 	t.Setenv("SWITCHBOARD_GO_CONFIG", configPath)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/models" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"data":[{"id":"gpt-4"}]}`))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"ok"}}]}`))
+	}))
+	defer upstream.Close()
 	app := newApp(Config{
 		ProxyAPIKey:         "p",
 		UpstreamAPIKeys:     []KeyEntry{{Key: "existing"}},
-		UpstreamBaseURL:     "http://example.com",
+		UpstreamBaseURL:     upstream.URL,
 		MaxRequestBodyBytes: 1,
 	})
 	mux := setupMux(app)
