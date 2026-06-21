@@ -33,17 +33,19 @@ OpenAI-compatible app -> http://127.0.0.1:8080/v1 -> OpenCode Go
 ```bash
 KEY=$(openssl rand -hex 32) \
   && mkdir -p config \
-  && cat > config/config.json <<EOF
-{
-  "proxy_api_key": "$KEY",
-  "listen_addr": "0.0.0.0:8080",
-  "upstream_base_url": "https://opencode.ai/zen/go/v1",
-  "upstream_api_keys": [],
-  "max_request_body_bytes": 20971520,
-  "request_log_size": 500,
-  "smtp_port": 25
-}
-EOF
+  && python3 -c "
+import json, sys
+key = sys.argv[1]
+json.dump({
+    'proxy_api_key': key,
+    'listen_addr': '0.0.0.0:8080',
+    'upstream_base_url': 'https://opencode.ai/zen/go/v1',
+    'upstream_api_keys': [],
+    'max_request_body_bytes': 20971520,
+    'request_log_size': 500,
+    'smtp_port': 25,
+}, open('config/config.json', 'w'), indent=2)
+" "$KEY" \
   && curl -sLo docker-compose.yml https://raw.githubusercontent.com/kjhq/switchboard-go/main/docker-compose.yml \
   && docker compose up -d \
   && echo "Dashboard: http://127.0.0.1:8080/dashboard/ (key: $KEY)"
