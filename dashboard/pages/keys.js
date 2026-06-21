@@ -57,10 +57,6 @@ export async function renderKeys(container, api) {
       }
     });
 
-    document.getElementById('new-key')?.addEventListener('paste', () => {
-      setTimeout(() => document.getElementById('validate-btn')?.click(), 100);
-    });
-
     document.querySelectorAll('[data-move-up]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const i = parseInt(btn.dataset.moveUp);
