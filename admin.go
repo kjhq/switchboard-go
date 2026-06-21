@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -505,7 +506,11 @@ func (a *App) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	env := append(os.Environ(),
+		"PROXY_API_KEY="+a.config.ProxyAPIKey,
+	)
 	restart := exec.Command("docker", "compose", "-f", composePath, "up", "-d")
+	restart.Env = env
 	if out, err := restart.CombinedOutput(); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{
 			"status": "error", "error": "restart failed: " + string(out),
