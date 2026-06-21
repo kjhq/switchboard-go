@@ -29,6 +29,18 @@ through your upstream OpenCode Go API keys when one is exhausted.
 OpenAI-compatible app -> http://127.0.0.1:8080/v1 -> OpenCode Go
 ```
 
+## Run with Docker (one-liner)
+
+No clone, no install. Just Docker:
+
+```bash
+curl -sL https://raw.githubusercontent.com/kjhq/switchboard-go/main/docker-compose.yml \
+  | PROXY_API_KEY=$(openssl rand -hex 32) docker compose -f - up -d
+```
+
+Open **http://127.0.0.1:8080/dashboard/** and log in with the generated key
+(visible in `docker compose logs`).
+
 ## Why this fork?
 
 The original is a CLI-only proxy. This fork adds:
