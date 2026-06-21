@@ -31,9 +31,10 @@ OpenAI-compatible app -> http://127.0.0.1:8080/v1 -> OpenCode Go
 ## Run with Docker
 
 ```bash
-KEY=$(openssl rand -hex 32) && echo "PROXY_API_KEY: $KEY" \
+KEY=$(openssl rand -hex 32) && export PROXY_API_KEY=$KEY \
+  && echo "PROXY_API_KEY: $PROXY_API_KEY" \
   && curl -sLo docker-compose.yml https://raw.githubusercontent.com/kjhq/switchboard-go/main/docker-compose.yml \
-  && PROXY_API_KEY=$KEY docker compose up -d
+  && docker compose up -d
 ```
 
 Open **http://127.0.0.1:8080/dashboard/** and log in with that key.
