@@ -466,17 +466,22 @@ func (a *App) handleUpdateCheck(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"current": Version, "latest": "", "update_available": false,
-			"error": "failed to check updates",
 		})
 		return
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusNotFound {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"current": Version, "latest": "", "update_available": false,
+		})
+		return
+	}
+
 	var rel releaseInfo
 	if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil || rel.TagName == "" {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"current": Version, "latest": "", "update_available": false,
-			"error": "failed to parse release info",
 		})
 		return
 	}
