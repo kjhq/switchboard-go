@@ -32,7 +32,18 @@ OpenAI-compatible app -> http://127.0.0.1:8080/v1 -> OpenCode Go
 
 ```bash
 KEY=$(openssl rand -hex 32) \
-  && echo "PROXY_API_KEY=$KEY" > .env \
+  && mkdir -p config \
+  && cat > config/config.json <<EOF
+{
+  "proxy_api_key": "$KEY",
+  "listen_addr": "0.0.0.0:8080",
+  "upstream_base_url": "https://opencode.ai/zen/go/v1",
+  "upstream_api_keys": [],
+  "max_request_body_bytes": 20971520,
+  "request_log_size": 500,
+  "smtp_port": 25
+}
+EOF
   && curl -sLo docker-compose.yml https://raw.githubusercontent.com/kjhq/switchboard-go/main/docker-compose.yml \
   && docker compose up -d \
   && echo "Dashboard: http://127.0.0.1:8080/dashboard/ (key: $KEY)"
@@ -53,12 +64,13 @@ The original is a CLI-only proxy. This fork adds:
 
 ## Settings
 
-Only `PROXY_API_KEY` is required as an environment variable. Everything else is
-configured through the dashboard or stored in `~/.config/switchboard-go/config.json`.
+`PROXY_API_KEY` must be set — either in `config/config.json` (created by the one-liner above)
+or via the `PROXY_API_KEY` environment variable for backward compatibility. Everything else is
+configured through the dashboard or stored in `config/config.json`.
 
 | Env var | Required | Description |
 |---|---|---|
-| `PROXY_API_KEY` | Yes | Key clients use to access Switchboard Go. |
+| `PROXY_API_KEY` | No* | Key clients use to access Switchboard Go. Falls back to `proxy_api_key` in config file. |
 | `OPENCODE_GO_API_KEYS` | No | Seeds keys on first run (ignored afterwards). |
 
 On first run, if no config file exists, the proxy starts with default settings

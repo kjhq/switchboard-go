@@ -50,7 +50,7 @@ func KeyEntriesToNames(entries []KeyEntry) []string {
 type Config struct {
 	ListenAddr          string     `json:"listen_addr"`
 	UpstreamBaseURL     string     `json:"upstream_base_url"`
-	ProxyAPIKey         string     `json:"-"`
+	ProxyAPIKey         string     `json:"proxy_api_key,omitempty"`
 	UpstreamAPIKeys     []KeyEntry `json:"upstream_api_keys"`
 	MaxRequestBodyBytes int64      `json:"max_request_body_bytes"`
 	RequestLogSize      int        `json:"request_log_size"`
@@ -89,24 +89,33 @@ func ConfigPath() string {
 
 func LoadConfig() (Config, error) {
 	cfg := DefaultConfig()
-	proxyKey := strings.TrimSpace(os.Getenv("PROXY_API_KEY"))
-	if proxyKey == "" {
-		return Config{}, fmt.Errorf("PROXY_API_KEY is required")
-	}
-	cfg.ProxyAPIKey = proxyKey
+	path := ConfigPath()
 
+	// Load existing config file (may include proxy_api_key now)
+	if path != "" {
+		data, err := os.ReadFile(path)
+		if err == nil {
+			json.Unmarshal(data, &cfg)
+		} else if !os.IsNotExist(err) {
+			return Config{}, fmt.Errorf("read config: %w", err)
+		}
+	}
+
+	// Env overrides config file
+	if proxyKey := strings.TrimSpace(os.Getenv("PROXY_API_KEY")); proxyKey != "" {
+		cfg.ProxyAPIKey = proxyKey
+	}
 	if cp := strings.TrimSpace(os.Getenv("COMPOSE_FILE_PATH")); cp != "" {
 		cfg.DockerComposePath = cp
 	}
 
-	path := ConfigPath()
-	if path == "" {
-		return cfg, nil
+	if !cfg.ProxyAPIKeySet() {
+		return Config{}, fmt.Errorf("PROXY_API_KEY is required (set PROXY_API_KEY env var or proxy_api_key in config file)")
 	}
 
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if os.IsNotExist(err) {
+	// First-run: seed from env and save
+	if path != "" {
+		if _, err := os.Stat(path); os.IsNotExist(err) {
 			if seed := strings.TrimSpace(os.Getenv("OPENCODE_GO_API_KEYS")); seed != "" {
 				for _, k := range strings.Split(seed, ",") {
 					if s := strings.TrimSpace(k); s != "" {
@@ -117,15 +126,9 @@ func LoadConfig() (Config, error) {
 			if saveErr := SaveConfig(cfg, path); saveErr != nil {
 				return cfg, saveErr
 			}
-			return cfg, nil
 		}
-		return Config{}, fmt.Errorf("read config: %w", err)
 	}
 
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return Config{}, fmt.Errorf("parse config: %w", err)
-	}
-	cfg.ProxyAPIKey = proxyKey
 	return cfg, nil
 }
 
